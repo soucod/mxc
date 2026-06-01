@@ -83,6 +83,59 @@ jobs:
         condition: and(eq('${{ item.os }}','linux'), eq('${{ item.arch }}','arm64'))
 
       - ${{ if eq(parameters.isOfficialBuild, true) }}:
+
+        # --- Telemetry GUID substitution (official builds only, mirrors WinAppSDK) ---
+        # For internal builds, the real Microsoft telemetry group GUID is
+        # compiled in by overwriting WIL's public no-op traceloggingconfig.h
+        # with MicrosoftTelemetry.h from the private Microsoft.Telemetry.Inbox.Native
+        # NuGet package. Community/OSS builds skip these steps — build.rs
+        # compiles against the public stub and events fire as plain ETW.
+
+        # 1. Authenticate to the private NuGet feed hosting the telemetry package.
+        - task: NuGetAuthenticate@1
+          displayName: 'NuGet authenticate for telemetry config'
+          inputs:
+            nuGetServiceConnections: 'TelemetryInternal'
+          condition: and(succeeded(), eq('${{ item.os }}', 'windows'))
+
+        # 2. Restore Microsoft.Telemetry.Inbox.Native into build/telemetry/packages/.
+        - task: NuGetCommand@2
+          displayName: 'Restore Microsoft.Telemetry.Inbox.Native'
+          inputs:
+            command: 'custom'
+            arguments: >-
+              restore $(Build.SourcesDirectory)/build/telemetry/packages.config
+              -ConfigFile $(Build.SourcesDirectory)/build/telemetry/nuget.config
+              -PackagesDirectory $(Build.SourcesDirectory)/build/telemetry/packages
+          condition: and(succeeded(), eq('${{ item.os }}', 'windows'))
+
+        # 3. Find MicrosoftTelemetry.h and set the env var so build.rs picks it up.
+        - powershell: |
+            $srcPath = Get-ChildItem -Path '$(Build.SourcesDirectory)/build/telemetry/packages' `
+                       -File 'MicrosoftTelemetry.h' -Recurse -ErrorAction SilentlyContinue
+            if ($srcPath) {
+                Write-Host "Found telemetry config override: $($srcPath.FullName)"
+                Write-Host "##vso[task.setvariable variable=MXC_TELEMETRY_CONFIG_OVERRIDE]$($srcPath.FullName)"
+            } else {
+                Write-Host "MicrosoftTelemetry.h not found under $(Build.SourcesDirectory)/build/telemetry/packages/"
+                Get-ChildItem -Path '$(Build.SourcesDirectory)/build/telemetry/packages' -Recurse -ErrorAction SilentlyContinue
+            }
+          displayName: 'Set MXC_TELEMETRY_CONFIG_OVERRIDE'
+          condition: and(succeeded(), eq('${{ item.os }}', 'windows'))
+
+        # --- SDK license override (mirrors telemetry GUID substitution) ---
+        # For internal npm publishes, the public MIT-only LICENSE.md is replaced
+        # with a private EULA containing a Section 2 DATA clause (telemetry
+        # disclosure, GDPR). The private EULA is sourced from an internal
+        # artifact store and injected via the MXC_LICENSE_OVERRIDE env var.
+        # Community/OSS builds skip this step — the SDK ships MIT-only.
+
+        # 4. Apply private EULA if MXC_LICENSE_OVERRIDE is set.
+        - powershell: |
+            & '$(Build.SourcesDirectory)/scripts/apply-license-override.ps1'
+          displayName: 'Apply SDK license override'
+          condition: and(succeeded(), ne(variables['MXC_LICENSE_OVERRIDE'], ''))
+
         - template: Rust.Build.Steps.Official.yml@self
           parameters:
             targetTriple: $(triplet)

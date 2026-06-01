@@ -1,0 +1,10 @@
+[package]
+name = "mxc_wil_telemetry"
+version.workspace = true
+edition.workspace = true
+description = "WIL-based TraceLogging ETW telemetry for MXC (C++ shim with Rust FFI)"
+
+[build-dependencies]
+cc = "1"
+zip = "2"
+ureq = "2"

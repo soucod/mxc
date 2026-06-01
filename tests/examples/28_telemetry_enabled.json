@@ -1,0 +1,13 @@
+{
+    "$schema": "../../schemas/dev/mxc-config.schema.0.6.0-dev.json",
+    "containment": "processcontainer",
+    "command": ["cmd.exe", "/c", "echo Hello from telemetry-enabled sandbox"],
+    "processContainer": {
+        "capabilities": ["permissiveLearningMode"]
+    },
+    "experimental": {
+        "telemetry": {
+            "enabled": true
+        }
+    }
+}
