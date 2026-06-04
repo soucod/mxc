@@ -85,14 +85,16 @@ pub fn sanitize_error_message(msg: &str) -> String {
 
     // Truncate to a reasonable length, respecting UTF-8 char boundaries
     // to avoid panics from `String::truncate` on multi-byte characters.
-    if sanitized.len() > 256 {
-        // Find the largest char boundary at or before byte index 256.
-        let mut truncate_at = 256;
+    const MAX_LEN: usize = 256;
+    const ELLIPSIS: &str = "...";
+    if sanitized.len() > MAX_LEN {
+        // Reserve space for the ellipsis so the final output is <= MAX_LEN.
+        let mut truncate_at = MAX_LEN.saturating_sub(ELLIPSIS.len());
         while !sanitized.is_char_boundary(truncate_at) {
             truncate_at -= 1;
         }
         sanitized.truncate(truncate_at);
-        sanitized.push_str("...");
+        sanitized.push_str(ELLIPSIS);
     }
 
     sanitized
