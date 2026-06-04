@@ -46,8 +46,13 @@ mod windows_build {
         let include_dir = cache_dir.join("include");
         let sentinel = cache_dir.join(SENTINEL_NAME);
 
-        // Only download + extract if we haven't already.
-        if !sentinel.exists() {
+        // Only download + extract if we haven't already, or if the cached version is stale.
+        let cached_version = fs::read_to_string(&sentinel).unwrap_or_default();
+        if cached_version.trim() != WIL_VERSION {
+            if cache_dir.exists() {
+                fs::remove_dir_all(&cache_dir)
+                    .expect("failed to clear stale WIL cache directory");
+            }
             fs::create_dir_all(&cache_dir).expect("failed to create WIL cache directory");
             download_and_extract_wil(&cache_dir, &include_dir);
             fs::write(&sentinel, WIL_VERSION).expect("failed to write WIL sentinel");
