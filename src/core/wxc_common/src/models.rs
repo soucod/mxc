@@ -559,7 +559,7 @@ pub struct ExperimentalConfig {
 #[serde(default)]
 pub struct TelemetryConfig {
     /// Explicit telemetry override.
-    /// `Some(true)` = force on, `Some(false)` = force off, `None` = build-type default.
+    /// `Some(true)` = force on, `Some(false)` = force off, `None` = default (off).
     pub enabled: Option<bool>,
 }
 
