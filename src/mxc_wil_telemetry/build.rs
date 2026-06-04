@@ -102,22 +102,17 @@ mod windows_build {
         // is all we need.
         for i in 0..archive.len() {
             let mut file = archive.by_index(i).unwrap();
-            let raw_name = file.name().to_owned();
+            let rel_path = match file.enclosed_name() {
+                Some(p) => p.to_owned(),
+                None => continue,
+            };
 
             // NuGet packages use forward-slash paths internally.
-            if !raw_name.starts_with("include/") || file.is_dir() {
+            if !rel_path.starts_with("include") || file.is_dir() {
                 continue;
             }
 
-            let dest = cache_dir.join(&raw_name);
-            // Guard against zip-slip: verify the resolved path stays within
-            // the cache directory. A malicious zip entry like
-            // "include/../../.cargo/config.toml" would pass the starts_with
-            // prefix check above but escape the cache directory.
-            assert!(
-                dest.starts_with(cache_dir),
-                "zip entry escapes cache directory: {raw_name}"
-            );
+            let dest = cache_dir.join(&rel_path);
             if let Some(parent) = dest.parent() {
                 fs::create_dir_all(parent).unwrap();
             }
